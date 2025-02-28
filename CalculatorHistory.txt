@@ -1,0 +1,187 @@
+//Java miniproject Calculator Histoey 
+
+
+ import javax.swing.*;
+import java.awt.event.*;
+import java.sql.*;
+
+public class CalculatorHistory extends JFrame implements ActionListener {
+    JTextField textField1, textField2, resultField;
+    JButton addButton, subtractButton, multiplyButton, divideButton, historyButton;
+    JLabel label1, label2, labelResult;
+    
+    public CalculatorHistory() {
+        label1 = new JLabel("First Number:");
+        label2 = new JLabel("Second Number:");
+        labelResult = new JLabel("Result:");
+        textField1 = new JTextField(10);
+        textField2 = new JTextField(10);
+        resultField = new JTextField(10);
+        resultField.setEditable(false);
+        
+        addButton = new JButton("Add");
+        subtractButton = new JButton("Subtract");
+        multiplyButton = new JButton("Multiply");
+        divideButton = new JButton("Divide");
+        historyButton = new JButton("Show History");
+
+        addButton.addActionListener(this);
+        subtractButton.addActionListener(this);
+        multiplyButton.addActionListener(this);
+        divideButton.addActionListener(this);
+        historyButton.addActionListener(this);
+
+        setLayout(null);
+        label1.setBounds(50, 50, 100, 30);
+        label2.setBounds(50, 100, 100, 30);
+        labelResult.setBounds(50, 150, 100, 30);
+        textField1.setBounds(160, 50, 100, 30);
+        textField2.setBounds(160, 100, 100, 30);
+        resultField.setBounds(160, 150, 100, 30);
+
+        addButton.setBounds(50, 200, 80, 30);
+        subtractButton.setBounds(140, 200, 100, 30);
+        multiplyButton.setBounds(250, 200, 100, 30);
+        divideButton.setBounds(360, 200, 80, 30);
+        historyButton.setBounds(150, 250, 150, 30);
+
+        add(label1);
+        add(label2);
+        add(labelResult);
+        add(textField1);
+        add(textField2);
+        add(resultField);
+        add(addButton);
+        add(subtractButton);
+        add(multiplyButton);
+        add(divideButton);
+        add(historyButton);
+
+        setSize(500, 350);
+        setTitle("Calculator with History");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setVisible(true);
+    }
+
+    public Connection getConnection() {
+        try {
+            String url = "jdbc:mysql://localhost:3306/calculator_db";
+            String username = "root";  // Your MySQL username
+            String password = "root";  // Your MySQL password
+            return DriverManager.getConnection(url, username, password);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Database connection failed: " + e.getMessage());
+            return null;
+        }
+    }
+
+    public void insertHistory(double firstNum, double secondNum, String operation, double result) {
+        Connection connection = null;
+        try {
+            connection = getConnection();
+            if (connection == null) {
+                System.out.println("Connection is null, aborting insert");
+                return;
+            }
+            
+            String query = "INSERT INTO history (first_number, second_number, operation, result) VALUES (?, ?, ?, ?)";
+            PreparedStatement statement = connection.prepareStatement(query);
+            statement.setDouble(1, firstNum);
+            statement.setDouble(2, secondNum);
+            statement.setString(3, operation);
+            statement.setDouble(4, result);
+            
+            int rowsInserted = statement.executeUpdate();
+            if (rowsInserted > 0) {
+                System.out.println("Data successfully inserted into the database");
+            } else {
+                System.out.println("No rows inserted");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Failed to insert history: " + e.getMessage());
+        } finally {
+            try {
+                if (connection != null) {
+                    connection.close();
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public void showHistory() {
+        Connection connection = null;
+        try {
+            connection = getConnection();
+            if (connection == null) {
+                return;
+            }
+
+            String query = "SELECT * FROM history";
+            Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery(query);
+
+            StringBuilder history = new StringBuilder();
+            while (resultSet.next()) {
+                history.append("Operation: ")
+                        .append(resultSet.getDouble("first_number")).append(" ")
+                        .append(resultSet.getString("operation")).append(" ")
+                        .append(resultSet.getDouble("second_number")).append(" = ")
+                        .append(resultSet.getDouble("result")).append("\n");
+            }
+
+            JOptionPane.showMessageDialog(this, history.toString());
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Failed to retrieve history: " + e.getMessage());
+        } finally {
+            try {
+                if (connection != null) {
+                    connection.close();
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        double num1, num2, result = 0;
+        String operation = "";
+
+        try {
+            num1 = Double.parseDouble(textField1.getText());
+            num2 = Double.parseDouble(textField2.getText());
+
+            if (e.getSource() == addButton) {
+                result = num1 + num2;
+                operation = "+";
+            } else if (e.getSource() == subtractButton) {
+                result = num1 - num2;
+                operation = "-";
+            } else if (e.getSource() == multiplyButton) {
+                result = num1 * num2;
+                operation = "*";
+            } else if (e.getSource() == divideButton) {
+                result = num1 / num2;
+                operation = "/";
+            } else if (e.getSource() == historyButton) {
+                showHistory();
+                return;
+            }
+
+            resultField.setText(String.valueOf(result));
+            insertHistory(num1, num2, operation, result);  // Save the result to the database
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Invalid input. Please enter valid numbers.");
+        }
+    }
+
+    public static void main(String[] args) {
+        new CalculatorHistory();
+    }
+}
